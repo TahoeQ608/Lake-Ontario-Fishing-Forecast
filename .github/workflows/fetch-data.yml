@@ -1,0 +1,47 @@
+name: Daily Lake Ontario Data Fetch
+
+on:
+  schedule:
+    - cron: '45 8 * * *'   # ~4:45 AM EDT
+    - cron: '45 19 * * *'  # ~3:45 PM EDT
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set today's date
+        id: date
+        run: echo "today=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Make today's folder
+        run: mkdir -p "data/${{ steps.date.outputs.today }}"
+
+      - name: Fetch buoy 45139 (Grimsby)
+        run: curl -sL "https://www.ndbc.noaa.gov/data/realtime2/45139.txt" -o "data/${{ steps.date.outputs.today }}/buoy-45139.txt"
+
+      - name: Fetch buoy 45159 (Ajax)
+        run: curl -sL "https://www.ndbc.noaa.gov/data/realtime2/45159.txt" -o "data/${{ steps.date.outputs.today }}/buoy-45159.txt"
+
+      - name: Fetch buoy 45012 (east end)
+        run: curl -sL "https://www.ndbc.noaa.gov/data/realtime2/45012.txt" -o "data/${{ steps.date.outputs.today }}/buoy-45012.txt"
+
+      - name: Fetch GLSEA Lake Ontario CSV
+        run: curl -sL "https://apps.glerl.noaa.gov/coastwatch/webdata/statistic/csv/all_year_glsea_avg_o_C.csv" -o "data/${{ steps.date.outputs.today }}/glsea-ontario-c.csv"
+
+      - name: Fetch GLCFS thermocline transect image
+        run: curl -sL "https://www.glerl.noaa.gov/res/glcfs/ont/trans.png" -o "data/${{ steps.date.outputs.today }}/transect.png"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --quiet --cached || git commit -m "Daily data fetch: ${{ steps.date.outputs.today }}"
+          git push
